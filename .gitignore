@@ -1,0 +1,9 @@
+.flake8
+mypy.ini
+.mypy_cache
+.venv
+**/*.egg-info
+**/__pycache__
+/apex
+**/build
+**/.ipynb_checkpoints
