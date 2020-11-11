@@ -5,6 +5,7 @@ PyTorch Dataset to load KITTI Raw Data
 import glob
 import os
 import re
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from PIL import Image
 from torch.utils.data import Dataset
@@ -15,25 +16,33 @@ from .lidar_point_cloud import load_lidar_point_cloud
 
 __all__ = ["KittiRawDataset"]
 
+_Cams = Union[
+    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
+]
+
+_Calibs = Union[
+    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
+]
+
 
 class KittiRawDataset(Dataset):
     def __init__(
         self,
         root: str,
-        select_cams=("cam_02",),
-        imu_data=False,
-        lidar_data=True,
-        select_calibs=(
+        select_cams: _Cams = ("cam_02",),
+        imu_data: bool = False,
+        lidar_data: Optional[str] = "projective",
+        select_calibs: _Calibs = (
             "cam_00",
             "cam_02",
         ),
-        transform=None,
-        download=False,
+        transform: Optional[Callable[[Dict], Dict]] = None,
+        download: bool = False,
     ):
         """
-        Returns a generator of paths inside the KITTI raw dataset.
-        KITTI raw data are organized by date and drive and inside each drive
-        are contained images taken by cameras, for example::
+        Dataset loading KITTI Raw Data available, KITTI raw data are organized by date
+        and drive and inside each drive are contained images taken by cameras,
+        for example::
 
             .
             └── 2011_09_26
@@ -60,25 +69,43 @@ class KittiRawDataset(Dataset):
                         └── data
                             └── ...
 
-        Calibration data refers to the whole date, this generator assumes this
-        structure and that `root` is pointing to the root of this schema.
+        Calibration data refers to the whole date.
+        Each example is a dictionary composed by many entries, such entries
+        can be selected at initialization time.
 
-        The Generator returns a dictionary containing:
-
-        #. lidar_points: lidar velodyne points path
-        #. calib_cam_to_cam: cam_2_cam path
-        #. calib_imu_to_velo: imu_2_velo path
-        #. calib_velo_to_cam: velo_2_cam path
-        #. cam_00: cam_00 path
-        #. cam_01: cam_01 path
-        #. cam_02: cam_00 path
-        #. cam_03: cam_01 path
-
+        #. cam_0X: PIL Image from camera X
+        #. lidar_data: ndarray Nx4 containing lidar \
+                       point cloud with respect to lidar coordinates
+        #. lidar_to_cam_00: [R|T] matrix from lidar to cam_00 coordinates in \
+                       projective space
+        #. cam_0X_calib: :class:`torch_kitti.raw.calibration.CamCalib` object \
+                       containing info about cam_0X calibration
+        #. imu_data: :class:`torch_kitti.raw.inertial_measurement_unit.IMUData` \
+                       object containing IMU data about the example
+        #. imu_to_lidar: [R|T] matrix from imu to lidar coordinates in projective \
+                       space
 
         Parameters
         ----------
         root: str
             path to the root of the dataset.
+        select_cams: Tuple[str], default ("cam_02",)
+            images to be loaded among cam_00, cam_01, cam_02, cam_03.
+        imu_data: bool, default False
+            if load IMU Data, when true examples will contain "imu_data" and also
+            "imu_to_lidar" fields
+        lidar_data: str, default "projective"
+            if "projective" Lidar Data are loaded in the projective space
+            (removing reflectance), if "reflectance" Lidar Data are loaded with
+            the reflectance, if None Lidar Data are not loaded. When enabled examples
+            will contain "lidar_data" and also "lidar_to_cam_00" fields
+        select_calibs: Tuple[str], default ("cam_00, "cam_02")
+            calibration objects to be loaded among cam_00, cam_01, cam_02, cam_03, they
+            are instances of :class:`torch_kitti.raw_calibration.CamCalib`
+        transform: Callable[[Dict], Dict], optional
+            transformation applied to each output dictionary
+        download: bool, default False
+            if download the dataset in `root` path
         """
 
         # params
@@ -89,6 +116,9 @@ class KittiRawDataset(Dataset):
 
         if download is True:
             raise NotImplementedError()
+
+        if lidar_data not in ["projective", "reflectance", None]:
+            raise ValueError("lidar data must be 'projective', 'reflectance' or None")
 
         # load cam images
         cam_00 = list(
@@ -155,11 +185,13 @@ class KittiRawDataset(Dataset):
         for calib in self.select_calibs:
             idx = int(re.compile("[0-9]{2}").findall(calib)[0])
             calib_file = CamCalib.open(idx, paths["cam2cam"])
-            output[f"cam_0{idx}"] = calib_file
+            output[f"cam_0{idx}_calib"] = calib_file
 
         # load lidar points
-        if self.lidar_data:
-            output["lidar_data"] = load_lidar_point_cloud(paths["lidar_point_cloud"])
+        if self.lidar_data is not None:
+            output["lidar_data"] = load_lidar_point_cloud(
+                paths["lidar_point_cloud"], self.lidar_data == "projective"
+            )
             output["lidar_to_cam_00"] = load_lidar_to_cam_00(paths["velo2cam"])
 
         # IMU Data
