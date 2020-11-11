@@ -32,7 +32,7 @@ def repos() -> List[str]:
     """
 
     drives_path = resource_filename(
-        "torch_kitti.synced_rectified.resources", "drives.pkl"
+        "torch_kitti.raw.synced_rectified.resources", "drives.pkl"
     )
     with open(drives_path, "rb") as f:
         drives = pickle.load(f)
@@ -158,7 +158,7 @@ def download(root_path: str, threads=6):
         bar.update(1)
 
     try:
-        for urls in chunks(repos, threads):
+        for urls in chunks(repos(), threads):
             pool = ThreadPool(threads)
             pool.map(download_unzip, urls)
     except (KeyboardInterrupt, Exception) as e:
