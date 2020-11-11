@@ -35,5 +35,6 @@ setup(
     ],
     extras_require={
         "dev": ["pytest", "pre-commit", "mypy", "flake8", "black", "isort"],
+        "doc": ["sphinx", "sphinx-rtd-theme"],
     },
 )
