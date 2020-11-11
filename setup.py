@@ -26,12 +26,14 @@ setup(
     entry_points={
         "console_scripts": ["torch_kitti = torch_kitti.scripts.torch_kitti:main"]
     },
-    package_data={"": ["*.txt"]},
+    package_data={"": ["*.txt", "*.pkl"]},
     install_requires=[
         "torch >= 1.5.0",
         "torchvision >= 0.6.0",
         "setuptools >= 46.3.0",
         "Pillow > 7.1.0",
+        "requests >= 2.24.0",
+        "tqdm >= 4.51.0",
     ],
     extras_require={
         "dev": ["pytest", "pre-commit", "mypy", "flake8", "black", "isort"],
