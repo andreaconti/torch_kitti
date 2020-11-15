@@ -20,9 +20,7 @@ setup(
     author_email="andrea.conti@tutanota.com",
     description="utilities and pytorch datasets for KITTI Vision Benchmark Suite",
     long_description=open("README.md").read(),
-    packages=find_packages(
-        exclude=["*.scripts", "*.scripts.*", "scripts.*", "scripts"],
-    ),
+    packages=find_packages(),
     entry_points={
         "console_scripts": ["torch_kitti = torch_kitti.scripts.torch_kitti:main"]
     },

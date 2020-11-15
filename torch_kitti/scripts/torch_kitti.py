@@ -4,14 +4,16 @@ Main program for torch kitti
 
 from argparse import ArgumentParser
 
-from torch_kitti.depth_completion.download import download as depth_completion_download
-from torch_kitti.raw.synced_rectified.download import download as sync_rect_download
+from torch_kitti.depth_completion import download as depth_completion_download
+from torch_kitti.depth_prediction import download as depth_prediction_download
+from torch_kitti.raw.synced_rectified import download as sync_rect_download
 
 # dowload datasets
 
 download_funcs = {
     "sync_rectified": sync_rect_download,
     "depth_completion": depth_completion_download,
+    "depth_prediction": depth_prediction_download,
 }
 
 
