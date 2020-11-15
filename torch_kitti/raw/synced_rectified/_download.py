@@ -12,9 +12,10 @@ from multiprocessing.pool import ThreadPool
 from typing import List
 from zipfile import ZipFile
 
-import requests
 from pkg_resources import resource_filename
 from tqdm import tqdm
+
+from .._download import download_calib, download_file
 
 __all__ = [
     "repos",
@@ -75,31 +76,6 @@ def check_drives(root: str) -> bool:
         return True
 
 
-def _download_file(url, save_path, chunk_size=1024, verbose=True):
-    """
-    Downloads a zip file from an `url` into a zip file in the
-    provided `save_path`.
-    """
-    r = requests.get(url, stream=True)
-    zip_name = url.split("/")[-1]
-
-    content_length = int(r.headers["Content-Length"]) / 10 ** 6
-
-    if verbose:
-        bar = tqdm(total=content_length, unit="Mb", desc="download " + zip_name)
-    with open(save_path, "wb") as fd:
-        for chunk in r.iter_content(chunk_size=chunk_size):
-            fd.write(chunk)
-            if verbose:
-                bar.update(chunk_size / 10 ** 6)
-
-    if verbose:
-        bar.close()
-
-
-# TODO: scaffold also config files
-
-
 def download(root_path: str, threads=6):
     """
     Provides a simple way to download and scaffold the whole kitti synced+rectified
@@ -137,7 +113,7 @@ def download(root_path: str, threads=6):
         os.makedirs(os.path.join(root_path, date), exist_ok=True)
 
         # download
-        _download_file(url, os.path.join(root_path, date, drive + ".zip"))
+        download_file(url, os.path.join(root_path, date, drive + ".zip"))
 
         # unzip
         with ZipFile(os.path.join(root_path, date, drive + ".zip"), "r") as zip_ref:
@@ -157,6 +133,10 @@ def download(root_path: str, threads=6):
         bar.update(1)
 
     try:
+        # download calibration files
+        download_calib(root_path)
+
+        # download drives
         for urls in chunks(repos(), threads):
             pool = ThreadPool(threads)
             pool.map(download_unzip, urls)
