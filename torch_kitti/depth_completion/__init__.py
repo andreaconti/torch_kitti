@@ -5,5 +5,5 @@ Dataset loading for Depth Completion KITTI Dataset
 
 __all__ = ["KittiDepthCompletionDataset", "download", "folders_check"]
 
+from ._download import download, folders_check
 from .dataset import KittiDepthCompletionDataset
-from .download import download, folders_check

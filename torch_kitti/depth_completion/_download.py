@@ -1,11 +1,13 @@
+import logging
 import os
-import shutil
 from zipfile import ZipFile
 
 import requests
 from tqdm import tqdm
 
 __all__ = ["download", "folders_check"]
+
+logger = logging.getLogger(__name__)
 
 
 def download_file(url, save_path, chunk_size=1024, verbose=True):
@@ -20,20 +22,28 @@ def download_file(url, save_path, chunk_size=1024, verbose=True):
 
     if verbose:
         bar = tqdm(total=content_length, unit="Mb", desc="download " + zip_name)
-    with open(save_path, "wb") as fd:
-        for chunk in r.iter_content(chunk_size=chunk_size):
-            fd.write(chunk)
-            if verbose:
-                bar.update(chunk_size / 10 ** 6)
 
-    if verbose:
-        bar.close()
+    try:
+        with open(save_path, "wb") as fd:
+            for chunk in r.iter_content(chunk_size=chunk_size):
+                fd.write(chunk)
+                if verbose:
+                    bar.update(chunk_size / 10 ** 6)
+    except (Exception, KeyboardInterrupt) as e:
+        os.remove(save_path)
+        raise e
+    finally:
+        if verbose:
+            bar.close()
 
 
-def download(root_path: str, verbose: bool = True):
+def download(root_path: str, progress_bar=True):
     """
     Downloads and scaffold depth completion dataset in `root_path`
     """
+
+    if not os.path.exists(root_path):
+        os.mkdir(root_path)
 
     # urls
     data_depth_selection_url = (
@@ -50,19 +60,22 @@ def download(root_path: str, verbose: bool = True):
     download_file(
         data_depth_selection_url,
         os.path.join(root_path, "data_depth_selection.zip"),
+        verbose=progress_bar,
     )
+
     download_file(
         data_depth_velodyne_url,
         os.path.join(root_path, "data_depth_velodyne.zip"),
+        verbose=progress_bar,
     )
     download_file(
         data_depth_annotated_url,
         os.path.join(root_path, "data_depth_annotated.zip"),
+        verbose=progress_bar,
     )
 
     # unzip and remove zips
-    if verbose:
-        print("unzipping...")
+    logging.info("unzipping...")
 
     with ZipFile(os.path.join(root_path, "data_depth_selection.zip"), "r") as zip_ref:
         zip_ref.extractall(root_path)
@@ -89,21 +102,18 @@ def download(root_path: str, verbose: bool = True):
         zip_ref.extractall(root_path)
 
     # remove zip files
-    shutil.rmtree(os.path.join(root_path, "data_depth_selection.zip"))
-    shutil.rmtree(os.path.join(root_path, "data_depth_completion.zip"))
-    shutil.rmtree(os.path.join(root_path, "data_depth_velodyne.zip"))
+    os.remove(os.path.join(root_path, "data_depth_selection.zip"))
+    os.remove(os.path.join(root_path, "data_depth_completion.zip"))
+    os.remove(os.path.join(root_path, "data_depth_velodyne.zip"))
 
-    if verbose:
-        print("done.")
+    logging.info("done.")
 
 
-def folders_check(root_path: str):
+def folders_check(root_path: str) -> bool:
     """
     Performs some simple checks about folders structure for depth completion dataset and
     prints errors
     """
-
-    ok = True
 
     for folder in [
         "test_depth_completion_anonymous",
@@ -111,9 +121,10 @@ def folders_check(root_path: str):
         "val_selection_cropped",
     ]:
         if not os.path.exists(os.path.join(root_path, folder)):
-            print(f"missing data_depth_selection.zip: folder {folder} not found")
-            print()
-            ok = False
+            logging.error(
+                f"missing data_depth_selection.zip: folder {folder} not found"
+            )
+            return False
 
     # check of data_depth_completion.zip and data_depth_velodyne.zip
     def check_gt_velodyne(folder):
@@ -127,23 +138,30 @@ def folders_check(root_path: str):
 
     gt_train, velodyne_train = check_gt_velodyne("train")
     if gt_train != 138 and velodyne_train != 138:
-        ok = False
-        print("something went wrong with data_depth_completion.zip and", end=" ")
-        print("data_depth_velodyne.zip in val folder")
+        logger.error(
+            "something went wrong with data_depth_completion.zip and \
+             data_depth_velodyne.zip in val folder"
+        )
 
-        print(f"found {gt_train} groundtruth folders and", end=" ")
-        print(f"{velodyne_train} raw_lidar folders but they should be 138..")
-        print()
+        logger.error(
+            f"found {gt_train} groundtruth folders and \
+             {velodyne_train} raw_lidar folders but they should be 138.."
+        )
+
+        return False
 
     gt_val, velodyne_val = check_gt_velodyne("val")
     if gt_val != 13 and velodyne_val != 13:
-        ok = False
-        print("something went wrong with data_depth_completion.zip and", end=" ")
-        print("data_depth_velodyne.zip in val folder")
+        logger.error(
+            "something went wrong with data_depth_completion.zip and \
+            data_depth_velodyne.zip in val folder"
+        )
 
-        print(f"found {gt_train} groundtruth folders and {velodyne_train}", end=" ")
-        print("raw_lidar folders but the should be 13..")
-        print()
+        logger.error(
+            f"found {gt_train} groundtruth folders and {velodyne_train} \
+             raw_lidar folders but the should be 13.."
+        )
 
-    if ok:
-        print("all good what ends well")
+        return False
+
+    return True

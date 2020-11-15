@@ -3,6 +3,7 @@ Utilities to automate RAW data downloading from
 :ref:`http://www.cvlibs.net/datasets/kitti/raw_data.php`
 """
 
+import logging
 import os
 import pickle
 import re
@@ -20,6 +21,8 @@ __all__ = [
     "check_drives",
     "download",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def repos() -> List[str]:
@@ -49,7 +52,7 @@ def repos() -> List[str]:
     return list(map(concat_prefix, repos))
 
 
-def check_drives(root: str, verbose: bool = True) -> bool:
+def check_drives(root: str) -> bool:
     """
     Performs a check of all drives contained in the kitti root folders
     and prints a report
@@ -65,15 +68,11 @@ def check_drives(root: str, verbose: bool = True) -> bool:
         if not os.path.exists(os.path.join(root, date, drive)):
             missing.append(drive)
 
-    if verbose:
-        if len(missing) != 0:
-            print("missing drives:")
-            for drive in missing:
-                print("-", drive)
-        else:
-            print("all drives found")
-
-    return len(missing) == 0
+    if len(missing) != 0:
+        logging.error("missing drives: " + "\n".join("- " + drive for drive in missing))
+        return False
+    else:
+        return True
 
 
 def _download_file(url, save_path, chunk_size=1024, verbose=True):
@@ -169,7 +168,7 @@ def download(root_path: str, threads=6):
 
             # clean drive
             drive_path = os.path.join(root_path, date, drive)
-            print("removing ", drive_path)
+            logger.info("removing " + drive_path)
             shutil.rmtree(drive_path, ignore_errors=True)
             if os.path.exists(drive_path + ".zip"):
                 os.remove(drive_path + ".zip")
