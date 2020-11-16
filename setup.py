@@ -34,7 +34,7 @@ setup(
         "tqdm >= 4.51.0",
     ],
     extras_require={
-        "dev": ["pytest", "pre-commit", "mypy", "flake8", "black", "isort"],
+        "dev": ["pytest", "pre-commit", "mypy", "flake8", "black", "isort", "tox"],
         "doc": ["sphinx", "sphinx-rtd-theme"],
     },
 )

@@ -7,3 +7,4 @@ mypy.ini
 /apex
 **/build
 **/.ipynb_checkpoints
+.tox
