@@ -3,6 +3,8 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+__all__ = ["apply_to_features", "add_features"]
+
 
 def apply_to_features(
     features: Optional[List[str]], transform: Callable, x: Dict, same_rand_state=True
@@ -57,3 +59,32 @@ def apply_to_features(
             random.setstate(rd_state)
 
     return y
+
+
+def add_features(transform: Callable[[Dict], Dict], x: Dict) -> Dict:
+    """
+    Takes the input, passes it to a transformation and merge the original
+    input with the result of the transformation, can be used to
+    augment data in the batch.
+
+    .. note::
+        transform type and input type must match.
+
+    Parameters
+    ----------
+    transform: Callable
+        transformation applied
+    x: Dict
+        data to transform
+
+    Example
+    -------
+
+    >>> add_features(lambda _: {'y': 1}, {'a': 2})
+    {'a': 2, 'y': 1}
+    """
+    results = transform(x)
+    if isinstance(results, dict) and isinstance(x, dict):
+        return dict(x, **results)
+    else:
+        raise ValueError("dictionaries supported only")

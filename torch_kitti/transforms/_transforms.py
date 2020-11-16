@@ -1,6 +1,8 @@
 from typing import Any, Callable, Dict, List, Optional
 
-from .functional import apply_to_features
+from .functional import add_features, apply_to_features
+
+__all__ = ["ApplyToFeatures", "AddFeatures"]
 
 
 class ApplyToFeatures:
@@ -43,3 +45,33 @@ class ApplyToFeatures:
 
     def __call__(self, x: Dict) -> Dict:
         return apply_to_features(self.features, self.transform, x, self.same_rand_state)
+
+
+class AddFeatures:
+    """
+    Takes the input, passes it to a transformation and merge the original
+    input with the result of the transformation, can be used to
+    augment data in the batch.
+
+    .. note::
+        transform type and input type must match.
+
+    Parameters
+    ----------
+    transform: Callable
+        transformation applied
+    x: Dict
+        data to transform
+
+    Example
+    -------
+
+    >>> add_features(lambda _: {'y': 1}, {'a': 2})
+    {'a': 2, 'y': 1}
+    """
+
+    def __init__(self, transform: Callable[[Dict], Dict]):
+        self.transform = transform
+
+    def __call__(self, x: Dict) -> Dict:
+        return add_features(self.transform, x)
