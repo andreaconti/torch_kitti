@@ -11,15 +11,15 @@ def test_apply_to_features():
     # test functional
     d = {"a": 1, "b": 1}
 
-    d_ = F.apply_to_features(["a", "b"], lambda x: x + random.random(), d)
+    d_ = F.apply_to_features(lambda x: x + random.random(), d, ["a", "b"])
     assert d_["a"] == d_["b"]
 
     d_ = F.apply_to_features(
-        ["a", "b"], lambda x: x + random.random(), d, same_rand_state=False
+        lambda x: x + random.random(), d, ["a", "b"], same_rand_state=False
     )
     assert d_["a"] != d_["b"]
 
     # test class
-    apply_to_features = ApplyToFeatures(["a", "b"], lambda x: x + np.random.rand())
+    apply_to_features = ApplyToFeatures(lambda x: x + np.random.rand(), ["a", "b"])
     d_ = apply_to_features(d)
     assert d_["a"] == d_["b"]

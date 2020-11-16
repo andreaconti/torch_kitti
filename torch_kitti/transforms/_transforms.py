@@ -29,14 +29,14 @@ class ApplyToFeatures:
     -------
 
     >>> d = {"a": np.random.randn(1, 3, 100, 100), "b": np.random.randn(1, 3, 100, 100)}
-    >>> d = ApplyToFeatures(["a", "b"], lambda x: x + np.random.rand())(d)
+    >>> d = ApplyToFeatures(lambda x: x + np.random.rand(), ["a", "b"])(d)
 
     """
 
     def __init__(
         self,
-        features: Optional[List[Any]],
         transform: Callable[[Any], Any],
+        features: Optional[List[Any]] = None,
         same_rand_state: bool = True,
     ):
         self.features = features
@@ -44,7 +44,7 @@ class ApplyToFeatures:
         self.same_rand_state = same_rand_state
 
     def __call__(self, x: Dict) -> Dict:
-        return apply_to_features(self.features, self.transform, x, self.same_rand_state)
+        return apply_to_features(self.transform, x, self.features, self.same_rand_state)
 
 
 class AddFeatures:

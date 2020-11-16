@@ -7,7 +7,10 @@ __all__ = ["apply_to_features", "add_features"]
 
 
 def apply_to_features(
-    features: Optional[List[str]], transform: Callable, x: Dict, same_rand_state=True
+    transform: Callable,
+    x: Dict,
+    features: Optional[List[str]] = None,
+    same_rand_state=True,
 ) -> Dict:
     """
     Apply the same transformation to a subset of features of a dictionary.
@@ -32,7 +35,7 @@ def apply_to_features(
     -------
 
     >>> d = {"a": np.random.randn(1, 3, 100, 100), "b": np.random.randn(1, 3, 100, 100)}
-    >>> d = apply_to_features(["a", "b"], lambda x: x + np.random.rand(), d)
+    >>> d = apply_to_features(lambda x: x + np.random.rand(), d, ["a", "b"])
 
     """
 
