@@ -100,9 +100,7 @@ class CamCalib:
         return CamCalib(
             cam=cam,
             image_size=image_size,
-            intrinsics=CamCalib._to_homologous_coord(
-                dict_values[f"K_{cams}"].reshape(3, 3)
-            ),
+            intrinsics=dict_values[f"K_{cams}"].reshape(3, 3),
             distortion=dict_values[f"D_{cams}"],
             extrinsics=extrinsics,
             rect_image_size=rect_image_size,
