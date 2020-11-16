@@ -5,8 +5,9 @@ Dataset loading for Depth Completion KITTI Dataset
 
 import errno
 import os
+import random
 import re
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Tuple, Union
 
 import numpy as np
 from PIL import Image
@@ -17,13 +18,7 @@ from torch_kitti.depth_completion import download as kitti_depth_completion_down
 from torch_kitti.depth_completion import (
     folders_check as kitti_depth_completion_folders_check,
 )
-from torch_kitti.raw.calibration import (
-    CamCalib,
-    load_imu_to_lidar,
-    load_lidar_to_cam_00,
-)
-from torch_kitti.raw.inertial_measurement_unit import IMUData
-from torch_kitti.raw.lidar_point_cloud import load_lidar_point_cloud
+from torch_kitti.raw.calibration import CamCalib
 from torch_kitti.raw.synced_rectified import check_drives as kitti_raw_check_drives
 from torch_kitti.raw.synced_rectified import download as kitti_raw_download
 
@@ -49,14 +44,13 @@ class KittiDepthCompletionDataset(Dataset):
 
     To load this dataset are needed:
 
-    KITTI Raw dataset
-        can be found at :ref:`http://www.cvlibs.net/datasets/kitti/raw_data.php`
-        and must be unzipped with the following folders structure:
+    KITTI Raw dataset (sync+rect)
+        can be found at :ref:`http://www.cvlibs.net/datasets/kitti/raw_data.php`,
+        automatically downloaded if required.
 
     KITTI depth completion maps
         can be found at :ref:`http://www.cvlibs.net/datasets/kitti/eval_depth.php?\
-        benchmark=depth_completion` and must be unzipped with the following structure
-        (the same stated in the development kit)
+        benchmark=depth_completion`, automatically downloaded if required
 
     Parameters
     ----------
@@ -68,19 +62,12 @@ class KittiDepthCompletionDataset(Dataset):
         If 'train' creates the dataset from training set, if 'val' creates
         the dataset from validation set, if 'test' creates the
         dataset from test set.
-    select_cams: Tuple[str], default ("cam_02",)
-        images to be loaded among cam_00, cam_01, cam_02, cam_03.
-    select_calibs: Tuple[str], default ("cam_00, "cam_02")
-        calibration objects to be loaded among cam_00, cam_01, cam_02, cam_03, they
-        are instances of :class:`torch_kitti.raw_calibration.CamCalib`.
-    imu_data: bool, default False
-        if load IMU Data, when true examples will contain "imu_data" and also
-        "imu_to_lidar" fields.
-    lidar_raw_data: str, optional
-        if "projective" Lidar Data are loaded in the projective space
-        (removing reflectance), if "reflectance" Lidar Data are loaded with
-        the reflectance, if None Lidar Data are not loaded. When enabled examples
-        will contain "lidar_data" and also "lidar_to_cam_00" fields.
+    load_stereo: bool, default False
+        if True each batch provides left and right synchronized and rectified
+        cameras (the dataset size is halved). Not available on testing.
+    load_previous: Union[int, Tuple[int, int]], optional
+        if used a previous nth frame from the same sequence is provided, a random
+        previous frame in the range (n, m) is choosen if provided a tuple.
     transform: Callable[[Dict], Dict], optional
         transformation applied to each output dictionary.
     download: bool, default False
@@ -89,8 +76,7 @@ class KittiDepthCompletionDataset(Dataset):
         it is not downloaded again.
 
     .. note::
-        On the test subset only the image, the groundtruth and the lidar image can be
-        provided
+        On the test subset `load_stereo` and `load_previous` can not be used
     """
 
     def __init__(
@@ -98,13 +84,13 @@ class KittiDepthCompletionDataset(Dataset):
         kitti_raw_root: str,
         depth_completion_root: str,
         subset: Literal["train", "val", "test"] = "train",
-        select_cams: Optional[_Cams] = None,
-        select_calibs: Optional[_Calibs] = None,
-        imu_data: bool = False,
-        lidar_raw_data: Literal[None, "projective", "reflectance"] = None,
-        transform: Callable[[Dict], Dict] = None,
+        load_stereo: bool = False,
+        load_previous: Union[Tuple[int, int], int] = 0,
+        transform: Callable[[Dict], Dict] = lambda x: x,
         download: bool = False,
     ):
+
+        # DOWNLOAD
 
         if download:
             # download depth completion dataset
@@ -129,22 +115,9 @@ class KittiDepthCompletionDataset(Dataset):
 
         # params
         self._subset = subset
+        self._load_stereo = load_stereo
+        self._load_previous = load_previous
         self.transform = transform
-        self._select_cams = list(select_cams) if select_cams is not None else []
-        self._select_calibs = list(select_calibs) if select_calibs is not None else []
-        self._imu_data = imu_data
-        self._lidar_raw_data = lidar_raw_data
-
-        # checks
-        for cam in self._select_cams:
-            if cam not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
-                raise ValueError("cam must be among cam_00, cam_01, cam_02, cam_03")
-        for calib in self._select_calibs:
-            if calib not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
-                raise ValueError("calib must be among cam_00, cam_01, cam_02, cam_03")
-        if self._lidar_raw_data:
-            if self._lidar_raw_data not in ["projective", "reflectance"]:
-                raise ValueError("lidar_raw_data is projective or reflectance")
 
         # computing paths
         if subset in ["train", "val"]:
@@ -175,48 +148,20 @@ class KittiDepthCompletionDataset(Dataset):
                     os.path.join(kitti_raw_root, date, drive, camera, "data", image)
                 )
 
+            # compute intrinsics
+            cam2cam = []
+            for img in images:
+                date = date_regex.findall(img)[0]
+                cam2cam.append(
+                    os.path.join(kitti_raw_root, date, "calib_cam_to_cam.txt")
+                )
+
             self._paths = [
-                {"img": img, "gt": gt, "lidar": lidar}
-                for img, gt, lidar in zip(images, groundtruths, all_lidar_raws)
+                {"img": img, "gt": gt, "lidar": lidar, "cam2cam": c2c}
+                for img, gt, lidar, c2c in zip(
+                    images, groundtruths, all_lidar_raws, cam2cam
+                )
             ]
-
-            for path in self._paths:
-
-                # append cams paths
-                for cam in self._select_cams:
-                    image = "image_{}".format(cam.split("_")[1].zfill(2))
-                    path[cam] = re.sub(r"image_\d+", image, path["img"])
-
-                # append selected calibs
-                if self._select_calibs:
-                    date = date_regex.findall(path["img"])[0]
-                    path["cam2cam"] = os.path.join(
-                        kitti_raw_root, date, "calib_cam_to_cam.txt"
-                    )
-
-                # append lidar data
-                if self._lidar_raw_data is not None:
-                    date = date_regex.findall(path["img"])[0]
-                    path["lidar_raw_data"] = (
-                        os.path.splitext(
-                            re.sub(r"image_\d+", "velodyne_points", path["img"])
-                        )[0]
-                        + ".bin"
-                    )
-                    path["lidar_raw_to_cam_00"] = os.path.join(
-                        kitti_raw_root, date, "calib_velo_to_cam.txt"
-                    )
-
-                # append imu data
-                if self._imu_data:
-                    date = date_regex.findall(path["img"])[0]
-                    path["imu_data"] = (
-                        os.path.splitext(re.sub(r"image_\d+", "oxts", path["img"]))[0]
-                        + ".txt"
-                    )
-                    path["imu_to_lidar"] = os.path.join(
-                        kitti_raw_root, date, "calib_imu_to_velo.txt"
-                    )
 
         elif subset == "test":
 
@@ -224,22 +169,41 @@ class KittiDepthCompletionDataset(Dataset):
                 depth_completion_root, "val_selection_cropped", "{0}"
             )
             files = [
-                os.path.join(folders, f.replace("groundtruth_depth", "{0}"))
+                os.path.join(folders, f.replace("groundtruth_depth", "{1}"))
                 for f in os.listdir(folders.format("groundtruth_depth"))
                 if os.path.isfile(os.path.join(folders.format("groundtruth_depth"), f))
             ]
 
             self._paths = [
                 {
-                    "img": path.format("image"),
-                    "gt": path.format("groundtruth_depth"),
-                    "lidar": path.format("velodyne_raw"),
+                    "img": path.format("image", "image"),
+                    "gt": path.format("groundtruth_depth", "groundtruth_depth"),
+                    "lidar": path.format("velodyne_raw", "velodyne_raw"),
+                    "intrinsics": os.path.splitext(path.format("intrinsics", "image"))[
+                        0
+                    ]
+                    + ".txt",
                 }
                 for path in files
             ]
 
         else:
             raise ValueError("subset must be train, val or test. Not {}".format(subset))
+
+        if load_stereo and subset == "test":
+            raise ValueError("on test data stereo is not available")
+        elif load_stereo:
+            for path in self._paths:
+                for key in path:
+                    path[key] = re.sub("image_0[23]", "{0}", path[key])
+            self._paths = list({v["img"]: v for v in self._paths}.values())
+
+        if (
+            isinstance(load_previous, (tuple))
+            or isinstance(load_previous, int)
+            and load_previous > 0
+        ) and subset == "test":
+            raise ValueError("on test data previous frame is not available")
 
     def _open_img(self, path):
         extensions = [".png", ".jpg"]
@@ -256,14 +220,14 @@ class KittiDepthCompletionDataset(Dataset):
 
         return image
 
-    def __getitem__(self, x):
-        paths = self._paths[x]
+    def _getitem(self, paths, _can_recur=True):
         result = dict()
 
+        cam_used = int(re.match(".*image_([0-9]+).*", paths["img"]).groups()[0])
+
         # open image
-        if "img" in paths:
-            img = self._open_img(paths["img"])
-            result["img"] = img
+        img = self._open_img(paths["img"])
+        result["img"] = img
 
         # compute lidar points
         if "lidar" in paths:
@@ -273,34 +237,65 @@ class KittiDepthCompletionDataset(Dataset):
             result["lidar"] = lidar
 
         # compute groundtruth points
-        if "gt" in paths:
-            gt = self._open_img(paths["gt"])
-            gt = np.array(gt).astype(np.float32) / 256.0
-            gt = np.expand_dims(gt, axis=-1)
-            result["gt"] = gt
+        gt = self._open_img(paths["gt"])
+        gt = np.array(gt).astype(np.float32) / 256.0
+        gt = np.expand_dims(gt, axis=-1)
+        result["gt"] = gt
 
-        # load all the optional stuff :)
-        if self._subset != "test":
-            for cam in self._select_cams:
-                result[cam] = self._open_img(paths[cam])
-            for calib in self._select_calibs:
-                idx = int(re.compile("[0-9]{2}").findall(calib)[0])
-                calib_file = CamCalib.open(idx, paths["cam2cam"])
-                result[f"cam_0{idx}_calib"] = calib_file
-            if self._lidar_raw_data:
-                result["lidar_raw_data"] = load_lidar_point_cloud(
-                    paths["lidar_raw_data"], self._lidar_raw_data
-                )
-                result["lidar_raw_to_cam_00"] = load_lidar_to_cam_00(
-                    paths["lidar_raw_to_cam_00"]
-                )
-            if self._imu_data:
-                result["imu_data"] = IMUData.open(paths["imu_data"])
-                result["imu_to_lidar"] = load_imu_to_lidar(paths["imu_to_lidar"])
+        # compute intrinsics
+        if "cam2cam" in paths:
+            calib = CamCalib.open(cam_used, paths["cam2cam"])
+            result["intrinsics"] = calib.intrinsics
+        elif "intrinsics" in paths:
+            with open(paths["intrinsics"], "rt") as f:
+                result["intrinsics"] = np.array(
+                    list(map(float, f.readline().strip().split(" ")))
+                ).reshape(3, 3)
 
-        if self.transform is not None:
-            result = self.transform(result)
-        return result
+        # compute previous
+        curr_img_idx = int(re.match(r".*([0-9]{10}).png$", paths["img"]).groups()[0])
+        if isinstance(self._load_previous, int) and self._load_previous > 0:
+            previous = max(0, curr_img_idx - self._load_previous)
+        elif isinstance(self._load_previous, tuple):
+            previous = max(0, curr_img_idx - random.randint(*self._load_previous))
+        else:
+            previous = None
+
+        if previous is not None and _can_recur:
+            idx = str(previous).zfill(10)
+            new_paths = dict()
+            for k in paths:
+                new_paths[k] = re.sub(r"[0-9]{10}$", idx + ".png", paths[k])
+            previous = self._getitem(new_paths, _can_recur=False)
+            for k in previous:
+                result[k + "_previous"] = previous[k]
+
+        return self.transform(result)
+
+    def __getitem__(self, x):
+
+        if self._load_stereo:
+            # load left
+            left_paths = dict(**self._paths[x])
+            for k in left_paths:
+                left_paths[k] = left_paths[k].format("image_02")
+            left_ex = self._getitem(left_paths)
+
+            # load right
+            right_paths = dict(**self._paths[x])
+            for k in right_paths:
+                right_paths[k] = right_paths[k].format("image_03")
+            right_ex = self._getitem(right_paths)
+
+            # rename and return
+            left_ex_, right_ex_ = dict(), dict()
+            for k_l, k_r in zip(left_ex.keys(), right_ex.keys()):
+                left_ex_[k_l + "_left"] = left_ex[k_l]
+                right_ex_[k_r + "_right"] = right_ex[k_r]
+
+            return dict(**left_ex_, **right_ex_)
+        else:
+            return self._getitem(self._paths[x])
 
     def __len__(self):
         return len(self._paths)
