@@ -21,7 +21,7 @@ setup(
     description="utilities and pytorch datasets for the KITTI Vision Benchmark Suite",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    licence="MIT",
+    license="MIT",
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
