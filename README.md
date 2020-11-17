@@ -74,6 +74,8 @@ $ cd torch_kitti
 $ python3 -m virtualenv .venv && source .venv/bin/activate  # (1)
 $ pip install .[dev, doc] # (2)
 $ pre-commit install  # (3)
+$ python3 setup.py develop
+$ pytest
 ```
 
 Tests use some environment variables to locate each dataset on the file system and perform specific tests on it. If they are not found tests are skipped.
