@@ -1,6 +1,14 @@
 # Pytorch KITTI
 
-This project aims to provide a simple yet effective way to scaffold and load the [KITTI Vision Banchmark Dataset](http://www.cvlibs.net/datasets/kitti/raw_data.php) providing **Datasets**, a simple way to **download** them, **metrics** and **transformations**.
+This project aims to provide a simple yet effective way to scaffold and load the [KITTI Vision Banchmark Dataset](http://www.cvlibs.net/datasets/kitti/raw_data.php) providing
+
+- **Datasets**: Pytorch datasets to load each dataset
+
+- **Scaffolding**: to download the datasets
+
+- **Metrics**: common metrics used for each dataset
+
+- **Transformations**: utilities to manipulate samples
 
 ## Installation
 
@@ -12,7 +20,7 @@ $ pip install torch-kitti
 
 ## Scaffolding datasets
 
-To manually download the datasets `torch-kitti` command line utility comes in handy:
+To manually download the datasets the `torch-kitti` command line utility comes in handy:
 
 ```bash
 $ torch_kitti download --help
@@ -37,7 +45,7 @@ Actually available datasets are:
 
 ## Loading Datasets
 
-All datasets return dictionaries, utilities to manipulate them can be found in `torch_kitti.transforms` module. Often each dataset provides options to include optional fields, for instance `KittiDepthCompletionDataset` usually provides simply the `img`, its sparse depth groundtruth `gt` and the sparse lidar hints `lidar` but using `load_stereo=True` stereo images will be included for each example.
+All datasets return dictionaries, utilities to manipulate them can be found in the `torch_kitti.transforms` module. Often each dataset provides options to include optional fields, for instance `KittiDepthCompletionDataset` usually provides simply the `img`, its sparse depth groundtruth `gt` and the sparse lidar hints `lidar` but using `load_stereo=True` stereo images will be included for each example.
 
 ```python
 from torchvision.transforms import Compose, RandomCrop, ToTensor
@@ -64,7 +72,9 @@ ds = KittiDepthCompletionDataset(
 )
 ```
 
-## Develop
+## Contributing
+
+### Developing setup
 
 Download from kitti and `cd` in the folder then prepare a virtual environment (1), install `dev` and `doc` dependencies (2) and `pre-commit` (3).
 
@@ -78,7 +88,10 @@ $ python3 setup.py develop
 $ pytest
 ```
 
-Tests use some environment variables to locate each dataset on the file system and perform specific tests on it. If they are not found tests are skipped.
+Feel free to open an issue on [GitHub](https://github.com/andreaconti/torch_kitti/issues), fork the [repository](https://github.com/andreaconti/torch_kitti) and submit a pull request to solve bugs, improve docs, add datasets and features. All new feature must be tested.
 
-* KITTI_SYNC_RECT_ROOT: root of the kitti sync rect dataset
-* KITTI_DEPTH_COMPLETION_ROOT: root of the kitti depth completion dataset
+
+
+## Disclaimer on KITTI Vision Benchmark Suite
+
+This library is an utility that downloads and prepares the dataset. The KITTI Vision Benchmark Suite is not hosted by this project nor it's claimed that you have license to use the dataset, it is your responsibility to determine whether you have permission to use this dataset under its license. You can find more details [here](http://www.cvlibs.net/datasets/kitti/).
