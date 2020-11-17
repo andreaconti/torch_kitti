@@ -4,18 +4,18 @@ This project aims to provide a simple yet effective way to scaffold and load the
 
 ## Installation
 
-To install `kitti-torch`:
+To install `torch-kitti`
 
 ```bash
-$ pip install kitti-torch
+$ pip install torch-kitti
 ```
 
 ## Scaffolding datasets
 
-To manually download the datasets `kitti_torch` command line utility comes in handy:
+To manually download the datasets `torch-kitti` command line utility comes in handy:
 
 ```bash
-$ kitti_torch download --help
+$ torch_kitti download --help
 usage: Torch Kitti download [-h]
                             {sync_rectified,depth_completion,depth_prediction}
                             path
