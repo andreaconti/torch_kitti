@@ -6,28 +6,19 @@ import pytest
 
 from torch_kitti.depth_prediction import KittiDepthPredictionDataset
 
-from ..dataset_utils import (
-    get_depth_completion_path,
-    get_sync_rect_path,
-    on_depth_completion_dataset,
-    on_sync_rect_dataset,
-)
 
-
-@on_sync_rect_dataset
-@on_depth_completion_dataset
-def test_dataset_train():
+def test_dataset_train(raw_sync_rect_path, depth_completion_path):
 
     # train subset
     ds = KittiDepthPredictionDataset(
-        get_sync_rect_path(),
-        get_depth_completion_path(),
+        raw_sync_rect_path,
+        depth_completion_path,
         subset="train",
         load_stereo=True,
         load_previous=1,
     )
 
-    assert len(ds) == 85898 // 2
+    assert len(ds) > 0
 
     ex = ds[0]
     keys = [

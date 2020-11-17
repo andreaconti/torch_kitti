@@ -2,13 +2,18 @@
 IMU Data testing
 """
 
+import glob
 import os
 
 from torch_kitti.raw.inertial_measurement_unit import IMUData
 
 
-def test_imu_data():
-    path = os.path.join(os.path.dirname(__file__), "test_data", "imu_data.txt")
+def test_imu_data(raw_sync_rect_path):
+
+    path = glob.glob(
+        os.path.join(raw_sync_rect_path, "**/0000000000.txt"), recursive=True
+    )[0]
+
     imu_data = IMUData.open(path)
 
     for field in [
