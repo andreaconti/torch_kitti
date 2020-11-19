@@ -1,5 +1,11 @@
 # Pytorch KITTI
 
+
+[![code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+![Python version](https://img.shields.io/badge/python-3.6|3.7|3.8-green.svg)
+[![PyPI version](https://badge.fury.io/py/torch-kitti.svg)](https://badge.fury.io/py/torch-kitti)
+![License](https://img.shields.io/pypi/l/torch-kitti)
+
 This project aims to provide a simple yet effective way to scaffold and load the [KITTI Vision Banchmark Dataset](http://www.cvlibs.net/datasets/kitti/raw_data.php) providing
 
 - **Datasets**: Pytorch datasets to load each dataset
