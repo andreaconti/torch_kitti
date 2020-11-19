@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Added KittiRawDataset `download` implementation for 'sync+rect'
 - Added KittiRawDataset `load_previous` option
+- Added ratio_threshold metric function
 
 ### Changed
 
