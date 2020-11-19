@@ -1,3 +1,5 @@
+from typing import Union
+
 import torch
 
 # DEPTH COMPLETION METRICS
@@ -11,24 +13,25 @@ __all__ = [
     "sq_rel_error",
     "abs_rel_error",
     "silog",
+    "ratio_threshold",
 ]
 
 
-def rmse(y_pred, y_true) -> torch.Tensor:
+def rmse(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     """
     computes the root mean squared error
     """
     return torch.sqrt(torch.mean(torch.square(y_pred - y_true)))
 
 
-def mse(y_pred, y_true) -> torch.Tensor:
+def mse(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     """
     computes the mean squared error
     """
     return torch.mean(torch.square(y_pred - y_true))
 
 
-def irmse(y_pred, y_true) -> torch.Tensor:
+def irmse(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     r"""
     Compute the inverse root mean squared error
 
@@ -39,14 +42,14 @@ def irmse(y_pred, y_true) -> torch.Tensor:
     return torch.sqrt(torch.mean(torch.square(1 / y_true - 1 / y_pred)))
 
 
-def mae(y_pred, y_true) -> torch.Tensor:
+def mae(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     """
     computes the mean absolute error
     """
     return torch.mean(torch.abs(y_pred - y_true))
 
 
-def imae(y_pred, y_true) -> torch.Tensor:
+def imae(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     r"""
     Compute inverse mean absolute error
 
@@ -60,7 +63,7 @@ def imae(y_pred, y_true) -> torch.Tensor:
 # DEPTH PREDICTION METRICS
 
 
-def sq_rel_error(y_pred, y_true) -> torch.Tensor:
+def sq_rel_error(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     r"""
     Computes the relative L2 error with respect to
     y_true
@@ -72,7 +75,7 @@ def sq_rel_error(y_pred, y_true) -> torch.Tensor:
     return torch.mean(torch.square(y_pred - y_true) / y_true)
 
 
-def abs_rel_error(y_pred, y_true) -> torch.Tensor:
+def abs_rel_error(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     r"""
     Computes the relative L1 error with respect to
     y_true
@@ -84,7 +87,7 @@ def abs_rel_error(y_pred, y_true) -> torch.Tensor:
     return torch.mean(torch.abs(y_pred - y_true) / y_true)
 
 
-def silog(y_pred, y_true) -> torch.Tensor:
+def silog(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     r"""
     Computes the scale invariant logarithmig error as states here_
 
@@ -94,3 +97,15 @@ def silog(y_pred, y_true) -> torch.Tensor:
     return torch.mean(
         torch.square(torch.log(y_true) - torch.log(y_pred))
     ) - torch.square(torch.mean(torch.log(y_true) - torch.log(y_pred)))
+
+
+def ratio_threshold(
+    threshold: Union[torch.Tensor, float], y_pred: torch.Tensor, y_true: torch.Tensor
+) -> torch.Tensor:
+    r"""
+    Computes the percentage of values whose maximum between thre ratio and the inverse
+    ratio with respect to the `y_true` is lower than the `threshold`.
+    """
+    result = torch.max(y_true / y_pred, y_pred / y_true)
+    result = (result < threshold).to(torch.float32).mean()
+    return result

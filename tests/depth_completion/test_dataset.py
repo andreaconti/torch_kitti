@@ -6,7 +6,9 @@ import pickle
 
 import pytest
 
-from torch_kitti.depth_completion import KittiDepthCompletionDataset
+from torch_kitti.depth_completion import KittiDepthCompletionDataset, folders_check
+
+# tests on the dataset
 
 
 @pytest.mark.parametrize("subset", ["train", "val"])
@@ -90,3 +92,10 @@ def test_dataset_value_error(raw_sync_rect_path, depth_completion_path):
 
 def test_pickable(raw_sync_rect_path, depth_completion_path):
     pickle.dumps(KittiDepthCompletionDataset(raw_sync_rect_path, depth_completion_path))
+
+
+# test folder check
+
+
+def test_folders_check(depth_completion_path):
+    assert folders_check(depth_completion_path) is True
