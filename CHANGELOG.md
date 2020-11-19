@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added KittiRawDataset `download` implementation for 'sync+rect'
+- Added KittiRawDataset `load_previous` option
+
 ### Changed
 
 ### Deprecated
@@ -15,6 +18,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Removed
 
 ### Fixed
+
+- Fixed testing fixture `depth_completion_path` for validation data generation
+- Fixed KittiDepthCompletionDataset `load_previous`
+- Fixed KittiDepthCompletionDataset on test data loading
+- Fixed KittiDepthPredictionDataset `load_previous`
+- Fixed KittiDepthPredictionDataset on test data loading
 
 ## [0.1.0] - 2020-11-17
 

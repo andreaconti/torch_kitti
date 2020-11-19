@@ -152,7 +152,7 @@ def depth_completion_path():
                     date + "_drive_" + str(drive).zfill(4) + "_sync",
                     "proj_depth",
                     ftype,
-                    "image_" + cam[4:],
+                    cam,
                     str(file_idx).zfill(10) + ".png",
                 )
 

@@ -2,18 +2,20 @@
 Tests over the KITTI Depth Completion Dataset
 """
 
+import pickle
+
 import pytest
 
 from torch_kitti.depth_completion import KittiDepthCompletionDataset
 
 
-def test_dataset_train(raw_sync_rect_path, depth_completion_path):
+@pytest.mark.parametrize("subset", ["train", "val"])
+def test_dataset(raw_sync_rect_path, depth_completion_path, subset):
 
-    # train subset
     ds = KittiDepthCompletionDataset(
         raw_sync_rect_path,
         depth_completion_path,
-        subset="train",
+        subset=subset,
         load_stereo=True,
         load_previous=1,
     )
@@ -43,6 +45,39 @@ def test_dataset_train(raw_sync_rect_path, depth_completion_path):
         assert key in ex.keys()
 
 
+def test_dataset_test(raw_sync_rect_path, depth_completion_path):
+
+    # test subset
+    with pytest.raises(ValueError):
+        ds = KittiDepthCompletionDataset(
+            raw_sync_rect_path,
+            depth_completion_path,
+            subset="test",
+            load_stereo=True,
+        )
+
+    with pytest.raises(ValueError):
+        ds = KittiDepthCompletionDataset(
+            raw_sync_rect_path,
+            depth_completion_path,
+            subset="test",
+            load_previous=1,
+        )
+
+    ds = KittiDepthCompletionDataset(
+        raw_sync_rect_path,
+        depth_completion_path,
+        subset="test",
+    )
+
+    assert len(ds) > 0
+
+    ex = ds[0]
+    keys = ["img", "gt", "intrinsics"]
+    for key in keys:
+        assert key in ex.keys()
+
+
 def test_dataset_value_error(raw_sync_rect_path, depth_completion_path):
 
     with pytest.raises(ValueError):
@@ -51,3 +86,7 @@ def test_dataset_value_error(raw_sync_rect_path, depth_completion_path):
             depth_completion_path,
             subset="something_wrong",
         )
+
+
+def test_pickable(raw_sync_rect_path, depth_completion_path):
+    pickle.dumps(KittiDepthCompletionDataset(raw_sync_rect_path, depth_completion_path))

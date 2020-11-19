@@ -52,7 +52,8 @@ class KittiDepthPredictionDataset(KittiDepthCompletionDataset):
         cameras (the dataset size is halved). Not available on testing.
     load_previous: Union[int, Tuple[int, int]], optional
         if used a previous nth frame from the same sequence is provided, a random
-        previous frame in the range (n, m) is choosen if provided a tuple.
+        previous frame in the range (n, m) is choosen if provided a tuple. If that
+        frame is not available is provided the same frame twice.
     transform: Callable[[Dict], Dict], optional
         transformation applied to each output dictionary.
     download: bool, default False

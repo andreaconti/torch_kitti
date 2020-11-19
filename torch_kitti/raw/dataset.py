@@ -4,15 +4,19 @@ PyTorch Dataset to load KITTI Raw Data
 
 import glob
 import os
+import random
 import re
 from typing import Callable, Dict, Optional, Tuple, Union
 
 from PIL import Image
 from torch.utils.data import Dataset
+from typing_extensions import Literal
 
 from .calibration import CamCalib, load_imu_to_lidar, load_lidar_to_cam_00
 from .inertial_measurement_unit import IMUData
 from .lidar_point_cloud import load_lidar_point_cloud
+from .synced_rectified import check_drives as sync_rect_check_drives
+from .synced_rectified import download as sync_rect_download
 
 __all__ = ["KittiRawDataset"]
 
@@ -36,8 +40,9 @@ class KittiRawDataset(Dataset):
             "cam_00",
             "cam_02",
         ),
+        load_previous: Union[Tuple[int, int], int] = 0,
         transform: Optional[Callable[[Dict], Dict]] = None,
-        download: bool = False,
+        download: Union[bool, Literal["sync+rect"]] = False,
     ):
         """
         Dataset loading KITTI Raw Data available, KITTI raw data are organized by date
@@ -102,23 +107,61 @@ class KittiRawDataset(Dataset):
         select_calibs: Tuple[str], default ("cam_00, "cam_02")
             calibration objects to be loaded among cam_00, cam_01, cam_02, cam_03, they
             are instances of :class:`torch_kitti.raw_calibration.CamCalib`
+        load_previous: Union[int, Tuple[int, int]], optional
+            if used a previous nth frame from the same sequence is provided, a random
+            previous frame in the range (n, m) is choosen if provided a tuple.
         transform: Callable[[Dict], Dict], optional
             transformation applied to each output dictionary
-        download: bool, default False
-            if download the dataset in `root` path
+        download: bool or sync+rect, default False
+            if True downloads the sync+rect version, otherwise the version of
+            the dataset can be provided but by now only "sync+rect" is available
         """
 
-        # params
-        self.select_cams = select_cams
+        # PARAMS
+
+        self.select_cams = set(select_cams)
         self.imu_data = imu_data
+        self.transform = transform
+        self._load_previous = load_previous
         self.lidar_data = lidar_data
         self.select_calibs = select_calibs
 
-        if download is True:
-            raise NotImplementedError()
+        # CHECK params
+
+        for cam in self.select_cams:
+            if cam not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
+                raise ValueError("each cam must be in range 0-3")
+
+        for calib in self.select_calibs:
+            if calib not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
+                raise ValueError("each calib must be in range 0-3")
 
         if lidar_data not in ["projective", "reflectance", None]:
             raise ValueError("lidar data must be 'projective', 'reflectance' or None")
+
+        if not isinstance(load_previous, (tuple, int)):
+            raise ValueError(
+                "load_previous must be and integer of a 2-tuple of integers"
+            )
+
+        if download not in [False, True, "sync+rect"]:
+            raise ValueError("download in True, False or sync+rect")
+
+        # DOWNLOAD
+
+        if download is True or download == "sync+rect":
+
+            # download sync+rect folders
+            if not os.path.exists(root):
+                sync_rect_download(root)
+            elif os.path.isdir(root) and not os.listdir(root):
+                sync_rect_download(root)
+
+        # check folders
+        if not sync_rect_check_drives(root):
+            raise ValueError(f"path {root} contains wrong data")
+
+        # PATHS LOADING
 
         # load cam images
         cam_00 = list(
@@ -173,12 +216,15 @@ class KittiRawDataset(Dataset):
     def __len__(self):
         return len(self._paths)
 
-    def __getitem__(self, x):
-        paths = self._paths[x]
+    def _getitem(self, paths, _can_recur=True):
         output = {}
+
+        # LOAD DATA
+        can_load_previous = None
 
         # load cams
         for cam in self.select_cams:
+            can_load_previous = int(os.path.splitext(os.path.basename(paths[cam]))[0])
             output[cam] = Image.open(paths[cam])
 
         # load config files
@@ -189,6 +235,9 @@ class KittiRawDataset(Dataset):
 
         # load lidar points
         if self.lidar_data is not None:
+            can_load_previous = int(
+                os.path.splitext(os.path.basename(paths["lidar_point_cloud"]))[0]
+            )
             output["lidar_data"] = load_lidar_point_cloud(
                 paths["lidar_point_cloud"], self.lidar_data == "projective"
             )
@@ -196,7 +245,35 @@ class KittiRawDataset(Dataset):
 
         # IMU Data
         if self.imu_data:
+            can_load_previous = int(
+                os.path.splitext(os.path.basename(paths["oxts"]))[0]
+            )
             output["imu_data"] = IMUData.open(paths["oxts"])
             output["imu_to_lidar"] = load_imu_to_lidar(paths["imu2velo"])
 
-        return output
+        # LOAD PREVIOUS
+        if can_load_previous is not None:
+            curr_idx = can_load_previous
+            if isinstance(self._load_previous, int) and self._load_previous > 0:
+                previous = max(0, curr_idx - self._load_previous)
+            elif isinstance(self._load_previous, tuple):
+                previous = max(0, curr_idx - random.randint(*self._load_previous))
+            else:
+                previous = None
+
+            if previous is not None and _can_recur:
+                idx = str(previous).zfill(10)
+                new_paths = dict()
+                for k in paths:
+                    new_paths[k] = re.sub(r"[0-9]{10}", idx, paths[k])
+                previous = self._getitem(new_paths, _can_recur=False)
+                for k in previous:
+                    output[k + "_previous"] = previous[k]
+
+        if self.transform is not None:
+            return self.transform(output)
+        else:
+            return output
+
+    def __getitem__(self, x):
+        return self._getitem(self._paths[x])

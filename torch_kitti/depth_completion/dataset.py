@@ -33,6 +33,10 @@ _Calibs = Union[
 ]
 
 
+def _identity(x: Dict) -> Dict:
+    return x
+
+
 class KittiDepthCompletionDataset(Dataset):
     """
     2017 KITTI depth completion benchmarks
@@ -67,7 +71,8 @@ class KittiDepthCompletionDataset(Dataset):
         cameras (the dataset size is halved). Not available on testing.
     load_previous: Union[int, Tuple[int, int]], optional
         if used a previous nth frame from the same sequence is provided, a random
-        previous frame in the range (n, m) is choosen if provided a tuple.
+        previous frame in the range (n, m) is choosen if provided a tuple. if such
+        frame cannot be found the same frame is returned as previous
     transform: Callable[[Dict], Dict], optional
         transformation applied to each output dictionary.
     download: bool, default False
@@ -86,9 +91,23 @@ class KittiDepthCompletionDataset(Dataset):
         subset: Literal["train", "val", "test"] = "train",
         load_stereo: bool = False,
         load_previous: Union[Tuple[int, int], int] = 0,
-        transform: Callable[[Dict], Dict] = lambda x: x,
+        transform: Callable[[Dict], Dict] = _identity,
         download: bool = False,
     ):
+
+        # PARAMS
+
+        self._subset = subset
+        self._load_stereo = load_stereo
+        self._load_previous = load_previous
+        self.transform = transform
+
+        if subset not in ["train", "val", "test"]:
+            raise ValueError("subset must be in train, val, test")
+        if not isinstance(load_previous, int) and not isinstance(load_previous, tuple):
+            raise ValueError("load_previous int or tuple")
+        if isinstance(load_previous, int) and load_previous < 0:
+            raise ValueError("load_previous >= 0")
 
         # DOWNLOAD
 
@@ -113,12 +132,6 @@ class KittiDepthCompletionDataset(Dataset):
         if not kitti_raw_check_drives(kitti_raw_root):
             raise ValueError(f"path {kitti_raw_root} contains wrong data")
 
-        # params
-        self._subset = subset
-        self._load_stereo = load_stereo
-        self._load_previous = load_previous
-        self.transform = transform
-
         # computing paths
         if subset in ["train", "val"]:
 
@@ -140,13 +153,16 @@ class KittiDepthCompletionDataset(Dataset):
 
             images = []
             for groundtruth_path in groundtruths:
-                drive = drive_regex.findall(groundtruth_path)[0]
-                date = date_regex.findall(groundtruth_path)[0]
-                camera = camera_regex.findall(groundtruth_path)[0]
-                image = groundtruth_path.split(os.path.sep)[-1]
-                images.append(
-                    os.path.join(kitti_raw_root, date, drive, camera, "data", image)
-                )
+                try:
+                    drive = drive_regex.findall(groundtruth_path)[0]
+                    date = date_regex.findall(groundtruth_path)[0]
+                    camera = camera_regex.findall(groundtruth_path)[0]
+                    image = groundtruth_path.split(os.path.sep)[-1]
+                    images.append(
+                        os.path.join(kitti_raw_root, date, drive, camera, "data", image)
+                    )
+                except IndexError:
+                    raise RuntimeError("wrong path {}".format(groundtruth_path))
 
             # compute intrinsics
             cam2cam = []
@@ -253,11 +269,26 @@ class KittiDepthCompletionDataset(Dataset):
                 ).reshape(3, 3)
 
         # compute previous
-        curr_img_idx = int(re.match(r".*([0-9]{10}).png$", paths["img"]).groups()[0])
         if isinstance(self._load_previous, int) and self._load_previous > 0:
+            curr_img_idx = int(
+                re.match(r".*([0-9]{10}).png$", paths["img"]).groups()[0]
+            )
             previous = max(0, curr_img_idx - self._load_previous)
+            if not os.path.exists(
+                re.sub(r"\d{10}", str(previous).zfill(10), paths["gt"])
+            ):
+                previous = curr_img_idx
+
         elif isinstance(self._load_previous, tuple):
+            curr_img_idx = int(
+                re.match(r".*([0-9]{10}).png$", paths["img"]).groups()[0]
+            )
             previous = max(0, curr_img_idx - random.randint(*self._load_previous))
+            if not os.path.exists(
+                re.sub(r"\d{10}", str(previous).zfill(10), paths["gt"])
+            ):
+                previous = curr_img_idx
+
         else:
             previous = None
 
@@ -265,7 +296,7 @@ class KittiDepthCompletionDataset(Dataset):
             idx = str(previous).zfill(10)
             new_paths = dict()
             for k in paths:
-                new_paths[k] = re.sub(r"[0-9]{10}$", idx + ".png", paths[k])
+                new_paths[k] = re.sub(r"[0-9]{10}", idx, paths[k])
             previous = self._getitem(new_paths, _can_recur=False)
             for k in previous:
                 result[k + "_previous"] = previous[k]
