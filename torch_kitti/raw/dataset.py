@@ -29,6 +29,10 @@ _Calibs = Union[
 ]
 
 
+def _identity(x: Dict) -> Dict:
+    return x
+
+
 class KittiRawDataset(Dataset):
     def __init__(
         self,
@@ -41,7 +45,7 @@ class KittiRawDataset(Dataset):
             "cam_02",
         ),
         load_previous: Union[Tuple[int, int], int] = 0,
-        transform: Optional[Callable[[Dict], Dict]] = None,
+        transform: Callable[[Dict], Dict] = _identity,
         download: Union[bool, Literal["sync+rect"]] = False,
     ):
         """
@@ -270,10 +274,7 @@ class KittiRawDataset(Dataset):
                 for k in previous:
                     output[k + "_previous"] = previous[k]
 
-        if self.transform is not None:
-            return self.transform(output)
-        else:
-            return output
+        return output
 
     def __getitem__(self, x):
-        return self._getitem(self._paths[x])
+        return self.transform(self._getitem(self._paths[x]))

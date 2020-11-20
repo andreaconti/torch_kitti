@@ -16,6 +16,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Fixed transform application in KittiDepthCompletionDataset when using `load_previous` and `load_stereo`
+- Fixed transform application in KittiRawDataset when using `load_previous`
+
 ## [0.2.0] - 2020-11-19
 
 ### Added

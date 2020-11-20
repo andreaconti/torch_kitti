@@ -2,6 +2,8 @@
 Tests about the dataset loader
 """
 
+import pickle
+
 import pytest
 
 from torch_kitti.raw.dataset import KittiRawDataset
@@ -52,7 +54,6 @@ keys_previous = {
 }
 
 
-@pytest.mark.parametrize("transform", [None, lambda x: x])
 @pytest.mark.parametrize(
     "load_previous, keys_expected",
     [
@@ -61,9 +62,7 @@ keys_previous = {
         ((1, 5), keys_previous),
     ],
 )
-def test_raw_dataset_loading(
-    raw_sync_rect_path, load_previous, transform, keys_expected
-):
+def test_raw_dataset_loading(raw_sync_rect_path, load_previous, keys_expected):
     ds = KittiRawDataset(
         raw_sync_rect_path,
         select_cams=("cam_00", "cam_01", "cam_02", "cam_03"),
@@ -71,13 +70,51 @@ def test_raw_dataset_loading(
         lidar_data="projective",
         select_calibs=("cam_00", "cam_01", "cam_02", "cam_03"),
         load_previous=load_previous,
-        transform=transform,
     )
 
     assert len(ds) > 0
     ex = ds[0]
     ex_keys = set(ex.keys())
     assert ex_keys == keys_expected
+
+
+def test_pickable(raw_sync_rect_path):
+
+    ds = KittiRawDataset(
+        raw_sync_rect_path,
+        select_cams=("cam_00", "cam_01", "cam_02", "cam_03"),
+        imu_data=True,
+        lidar_data="projective",
+        select_calibs=("cam_00", "cam_01", "cam_02", "cam_03"),
+    )
+
+    ds = pickle.dumps(ds)
+    ds = pickle.loads(ds)
+
+
+@pytest.mark.parametrize(
+    "load_previous, keys", [(0, keys_no_previous), (1, keys_previous)]
+)
+def test_dataset_transform(raw_sync_rect_path, load_previous, keys):
+    def assert_good_labels(ex):
+        for key in keys:
+            if key not in ex:
+                print(key)
+                print(ex.keys())
+            assert key in ex
+        return ex
+
+    ds = KittiRawDataset(
+        raw_sync_rect_path,
+        select_cams=("cam_00", "cam_01", "cam_02", "cam_03"),
+        imu_data=True,
+        lidar_data="projective",
+        select_calibs=("cam_00", "cam_01", "cam_02", "cam_03"),
+        load_previous=load_previous,
+        transform=assert_good_labels,
+    )
+
+    ds[0]
 
 
 # test folders

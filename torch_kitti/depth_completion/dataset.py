@@ -301,7 +301,7 @@ class KittiDepthCompletionDataset(Dataset):
             for k in previous:
                 result[k + "_previous"] = previous[k]
 
-        return self.transform(result)
+        return result
 
     def __getitem__(self, x):
 
@@ -324,9 +324,9 @@ class KittiDepthCompletionDataset(Dataset):
                 left_ex_[k_l + "_left"] = left_ex[k_l]
                 right_ex_[k_r + "_right"] = right_ex[k_r]
 
-            return dict(**left_ex_, **right_ex_)
+            return self.transform(dict(**left_ex_, **right_ex_))
         else:
-            return self._getitem(self._paths[x])
+            return self.transform(self._getitem(self._paths[x]))
 
     def __len__(self):
         return len(self._paths)
