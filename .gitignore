@@ -4,8 +4,8 @@ mypy.ini
 .venv
 **/*.egg-info
 **/__pycache__
-/apex
 **/build
+**/dist
 **/.ipynb_checkpoints
 .tox
 .coverage

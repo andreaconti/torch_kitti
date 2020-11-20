@@ -2,6 +2,7 @@ import random
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
+import torch
 
 __all__ = ["apply_to_features", "add_features"]
 
@@ -44,10 +45,12 @@ def apply_to_features(
         # move randomness
         np.random.rand()
         random.random()
+        torch.rand(1)
 
         # save state
         np_state = np.random.get_state()
         rd_state = random.getstate()
+        tr_state = torch.random.get_rng_state()
 
     y = dict(**x)
 
@@ -60,6 +63,7 @@ def apply_to_features(
         if same_rand_state:
             np.random.set_state(np_state)
             random.setstate(rd_state)
+            torch.set_rng_state(tr_state)
 
     return y
 
