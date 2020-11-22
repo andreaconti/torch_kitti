@@ -261,7 +261,7 @@ class KittiDepthCompletionDataset(Dataset):
         # compute intrinsics
         if "cam2cam" in paths:
             calib = CamCalib.open(cam_used, paths["cam2cam"])
-            result["intrinsics"] = calib.intrinsics
+            result["intrinsics"] = calib.projection_matrix[:, :-1]
         elif "intrinsics" in paths:
             with open(paths["intrinsics"], "rt") as f:
                 result["intrinsics"] = np.array(
