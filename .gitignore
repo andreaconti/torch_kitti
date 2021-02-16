@@ -1,5 +1,4 @@
 .flake8
-mypy.ini
 .mypy_cache
 .venv
 **/*.egg-info

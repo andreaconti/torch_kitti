@@ -85,10 +85,10 @@ class CamCalib:
         # convert
         cams = "0" + str(cam)
 
-        image_size = dict_values[f"S_{cams}"].astype(np.int)
+        image_size = dict_values[f"S_{cams}"].astype(int)
         image_size = (int(image_size[0]), int(image_size[1]))
 
-        rect_image_size = dict_values[f"S_rect_{cams}"].astype(np.int)
+        rect_image_size = dict_values[f"S_rect_{cams}"].astype(int)
         rect_image_size = (int(rect_image_size[0]), int(rect_image_size[1]))
 
         R = dict_values[f"R_{cams}"].reshape(3, 3)
