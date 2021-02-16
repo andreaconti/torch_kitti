@@ -9,3 +9,4 @@ mypy.ini
 **/.ipynb_checkpoints
 .tox
 .coverage
+.python-version
