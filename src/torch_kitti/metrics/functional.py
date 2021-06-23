@@ -95,8 +95,8 @@ def silog(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     """
 
     return torch.mean(
-        torch.square(torch.log(y_true) - torch.log(y_pred))
-    ) - torch.square(torch.mean(torch.log(y_true) - torch.log(y_pred)))
+        torch.square(torch.log(y_pred) - torch.log(y_true))
+    ) - torch.square(torch.mean(torch.log(y_pred) - torch.log(y_true)))
 
 
 def ratio_threshold(
