@@ -2,7 +2,7 @@
 
 
 [![code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-![Python version](https://img.shields.io/badge/python-3.6|3.7|3.8-green.svg)
+![Python version](https://img.shields.io/badge/python-3.6|3.7|3.8|3.9|3.10-green.svg)
 [![PyPI version](https://badge.fury.io/py/torch-kitti.svg)](https://badge.fury.io/py/torch-kitti)
 ![License](https://img.shields.io/pypi/l/torch-kitti)
 
@@ -73,9 +73,28 @@ ds = KittiDepthCompletionDataset(
     "kitti_raw_sync_rect_root",
     "kitti_depth_completion_root",
     load_stereo=False,
+    load_sequence=3,
     transform=transform,
     download=True,  # download if not found
 )
+```
+
+## Customizing Datasets
+
+Each dataset exposes the ``elems`` attribute, containing the paths used by each example loaded, and it can be modified to customize the loaded data, it is composed by ``DataGroup``s each containing many ``DataElem``s. These latter can load many different file types and each loader automatically will load them if added to each DataGroup, the supported data types are image, depth, pcd, calib, imu, rt and intrinsics.
+
+For example to load only a specific drive sequence for depth completion you could:
+
+```python
+
+class SeqKittiDepthCompletionDataset(KittiDepthCompletionDataset):
+    def __init__(self, drive_name: str, *args, **kwargs):
+        super().__init__(*args, subset="all", **kwargs)
+        self.elems = sorted(
+            filter(lambda group: group.drive == drive_name, self.elems),
+            key=lambda group: group.idx
+        )
+
 ```
 
 ## Contributing

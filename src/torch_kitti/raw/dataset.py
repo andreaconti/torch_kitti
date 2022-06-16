@@ -2,49 +2,120 @@
 PyTorch Dataset to load KITTI Raw Data
 """
 
-import glob
 import os
-import random
-import re
-from typing import Callable, Dict, Optional, Tuple, Union
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
-from PIL import Image
-from torch.utils.data import Dataset
+from torch_kitti.common import DataElem, DataGroup, GenericDataset, _LoadPrev
 from typing_extensions import Literal
 
-from .calibration import CamCalib, load_imu_to_lidar, load_lidar_to_cam_00
-from .inertial_measurement_unit import IMUData
-from .lidar_point_cloud import load_lidar_point_cloud
 from .synced_rectified import check_drives as sync_rect_check_drives
 from .synced_rectified import download as sync_rect_download
 
 __all__ = ["KittiRawDataset"]
-
-_Cams = Union[
-    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
-]
-
-_Calibs = Union[
-    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
-]
 
 
 def _identity(x: Dict) -> Dict:
     return x
 
 
-class KittiRawDataset(Dataset):
+def generate_examples(
+    root: str,
+    select_cams: List[int] = [2],
+    imu_data: bool = False,
+    lidar_data: Optional[str] = "projective",
+    select_calibs: List[int] = [0, 2],
+    load_previous: Union[Tuple[int, int], int] = 0,
+    load_sequence: int = 1,
+) -> List[DataGroup]:
+
+    # find velodyne
+    path = Path(root)
+    all_velodyne = [
+        DataElem("lidar_pcd", "pcd", path, cam=False, pcd_format=lidar_data)
+        for path in path.glob("**/velodyne_points/data/*.bin")
+    ]
+
+    # add info required
+    elems = []
+    for vel in all_velodyne:
+        ex_elems = [vel]
+
+        ex_elems.append(
+            DataElem(
+                "lidar_to_cam_00",
+                "rt",
+                path / vel.date / "calib_velo_to_cam.txt",
+                cam=False,
+                drive=vel.drive,
+                idx=vel.idx,
+            )
+        )
+
+        ex_elems.append(
+            DataElem(
+                "imu_to_lidar",
+                "rt",
+                path / vel.date / "calib_imu_to_velo.txt",
+                cam=False,
+                drive=vel.drive,
+                idx=vel.idx,
+            )
+        )
+
+        for cam in select_cams:
+            ex_elems.append(
+                DataElem(
+                    f"cam_{cam:0>2}",
+                    "image",
+                    str(vel.path.as_posix())
+                    .replace("velodyne_points", f"image_{cam:0>2}")
+                    .replace(".bin", ".png"),
+                )
+            )
+
+        if imu_data:
+            ex_elems.append(
+                DataElem(
+                    f"imu_data",
+                    "imu",
+                    str(vel.path.as_posix())
+                    .replace("velodyne_points", "oxts")
+                    .replace(".bin", ".txt"),
+                    cam=False,
+                )
+            )
+
+        for calib in select_calibs:
+            ex_elems.append(
+                DataElem(
+                    f"cam_{calib:0>2}_calib",
+                    "calib",
+                    path / vel.date / "calib_cam_to_cam.txt",
+                    cam=calib,
+                    drive=vel.drive,
+                    idx=vel.idx,
+                )
+            )
+
+        _load_prev_ = _LoadPrev(vel)
+        ex_elems = [
+            _load_prev_(elem, load_previous, load_sequence) for elem in ex_elems
+        ]
+        elems.append(DataGroup(ex_elems))
+    return elems
+
+
+class KittiRawDataset(GenericDataset):
     def __init__(
         self,
         root: str,
-        select_cams: _Cams = ("cam_02",),
+        select_cams: List[int] = [2],
         imu_data: bool = False,
         lidar_data: Optional[str] = "projective",
-        select_calibs: _Calibs = (
-            "cam_00",
-            "cam_02",
-        ),
+        select_calibs: List[int] = [0, 2],
         load_previous: Union[Tuple[int, int], int] = 0,
+        load_sequence: int = 1,
         transform: Callable[[Dict], Dict] = _identity,
         download: Union[bool, Literal["sync+rect"]] = False,
     ):
@@ -60,29 +131,29 @@ class KittiRawDataset(Dataset):
                 ├── calib_velo_to_cam.txt
                 └── 2011_09_26_drive_0002_sync
                     ├── image_00
-                    │   └── data
-                    │       └── ...
+                    │   └── data
+                    │       └── ...
                     ├── image_01
-                    │   └── data
-                    │       └── ...
+                    │   └── data
+                    │       └── ...
                     ├── image_02
-                    │   └── data
-                    │       └── ...
+                    │   └── data
+                    │       └── ...
                     ├── image_03
-                    │   └── data
-                    │       └── ...
+                    │   └── data
+                    │       └── ...
                     ├── oxts
-                    │   └── data
-                    │       └── ...
+                    │   └── data
+                    │       └── ...
                     └── velodyne_points
                         └── data
-                            └── ...
+                            └── ...
 
         Calibration data refers to the whole date.
         Each example is a dictionary composed by many entries, such entries
         can be selected at initialization time.
 
-        #. cam_0X: PIL Image from camera X
+        #. cam_0X: ndarray Image from camera X
         #. lidar_data: ndarray Nx4 containing lidar \
                        point cloud with respect to lidar coordinates
         #. lidar_to_cam_00: [R|T] matrix from lidar to cam_00 coordinates in \
@@ -114,6 +185,9 @@ class KittiRawDataset(Dataset):
         load_previous: Union[int, Tuple[int, int]], optional
             if used a previous nth frame from the same sequence is provided, a random
             previous frame in the range (n, m) is choosen if provided a tuple.
+        load_sequence: int, optional
+            It loads a sequence of frames, stacking them into a np.ndarray new dimension
+            or in a list.
         transform: Callable[[Dict], Dict], optional
             transformation applied to each output dictionary
         download: bool or sync+rect, default False
@@ -124,20 +198,20 @@ class KittiRawDataset(Dataset):
         # PARAMS
 
         self.select_cams = set(select_cams)
+        self.select_calibs = set(select_calibs)
         self.imu_data = imu_data
         self.transform = transform
         self._load_previous = load_previous
         self.lidar_data = lidar_data
-        self.select_calibs = select_calibs
 
         # CHECK params
 
         for cam in self.select_cams:
-            if cam not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
+            if cam not in range(4):
                 raise ValueError("each cam must be in range 0-3")
 
         for calib in self.select_calibs:
-            if calib not in ["cam_00", "cam_01", "cam_02", "cam_03"]:
+            if calib not in range(4):
                 raise ValueError("each calib must be in range 0-3")
 
         if lidar_data not in ["projective", "reflectance", None]:
@@ -165,116 +239,15 @@ class KittiRawDataset(Dataset):
         if not sync_rect_check_drives(root):
             raise ValueError(f"path {root} contains wrong data")
 
-        # PATHS LOADING
+        # PATHS
 
-        # load cam images
-        cam_00 = list(
-            filter(
-                lambda f: "image_00" in f,
-                glob.iglob(os.path.join(root, "**", "*.png"), recursive=True),
-            )
+        elems = generate_examples(
+            root,
+            select_cams,
+            imu_data,
+            lidar_data,
+            select_calibs,
+            load_previous,
+            load_sequence,
         )
-        cam_01 = [f.replace("image_00", "image_01", 1) for f in cam_00]
-        cam_02 = [f.replace("image_00", "image_02", 1) for f in cam_00]
-        cam_03 = [f.replace("image_00", "image_02", 1) for f in cam_00]
-
-        # load lidar points
-        lidar = [
-            os.path.splitext(f.replace("image_00", "velodyne_points"))[0] + ".bin"
-            for f in cam_00
-        ]
-
-        # load oxts
-        oxts = [
-            os.path.splitext(f.replace("image_00", "oxts"))[0] + ".txt" for f in cam_00
-        ]
-
-        # load calib files
-        date_match = re.compile("[0-9]+_[0-9]+_[0-9]+")
-
-        def extract_path(f, fname):
-            date = date_match.findall(f)[0]
-            return os.path.join(root, date, fname)
-
-        cam2cam = [extract_path(f, "calib_cam_to_cam.txt") for f in cam_00]
-        velo2cam = [extract_path(f, "calib_velo_to_cam.txt") for f in cam_00]
-        imu2velo = [extract_path(f, "calib_imu_to_velo.txt") for f in cam_00]
-
-        self._paths = [
-            {
-                "cam_00": c00,
-                "cam_01": c01,
-                "cam_02": c02,
-                "cam_03": c03,
-                "lidar_point_cloud": l_pc,
-                "oxts": o,
-                "cam2cam": c2c,
-                "velo2cam": v2c,
-                "imu2velo": i2v,
-            }
-            for c00, c01, c02, c03, l_pc, o, c2c, v2c, i2v in zip(
-                cam_00, cam_01, cam_02, cam_03, lidar, oxts, cam2cam, velo2cam, imu2velo
-            )
-        ]
-
-    def __len__(self):
-        return len(self._paths)
-
-    def _getitem(self, paths, _can_recur=True):
-        output = {}
-
-        # LOAD DATA
-        can_load_previous = None
-
-        # load cams
-        for cam in self.select_cams:
-            can_load_previous = int(os.path.splitext(os.path.basename(paths[cam]))[0])
-            output[cam] = Image.open(paths[cam])
-
-        # load config files
-        for calib in self.select_calibs:
-            idx = int(re.compile("[0-9]{2}").findall(calib)[0])
-            calib_file = CamCalib.open(idx, paths["cam2cam"])
-            output[f"cam_0{idx}_calib"] = calib_file
-
-        # load lidar points
-        if self.lidar_data is not None:
-            can_load_previous = int(
-                os.path.splitext(os.path.basename(paths["lidar_point_cloud"]))[0]
-            )
-            output["lidar_data"] = load_lidar_point_cloud(
-                paths["lidar_point_cloud"], self.lidar_data == "projective"
-            )
-            output["lidar_to_cam_00"] = load_lidar_to_cam_00(paths["velo2cam"])
-
-        # IMU Data
-        if self.imu_data:
-            can_load_previous = int(
-                os.path.splitext(os.path.basename(paths["oxts"]))[0]
-            )
-            output["imu_data"] = IMUData.open(paths["oxts"])
-            output["imu_to_lidar"] = load_imu_to_lidar(paths["imu2velo"])
-
-        # LOAD PREVIOUS
-        if can_load_previous is not None:
-            curr_idx = can_load_previous
-            if isinstance(self._load_previous, int) and self._load_previous > 0:
-                previous = max(0, curr_idx - self._load_previous)
-            elif isinstance(self._load_previous, tuple):
-                previous = max(0, curr_idx - random.randint(*self._load_previous))
-            else:
-                previous = None
-
-            if previous is not None and _can_recur:
-                idx = str(previous).zfill(10)
-                new_paths = dict()
-                for k in paths:
-                    new_paths[k] = re.sub(r"[0-9]{10}", idx, paths[k])
-                previous = self._getitem(new_paths, _can_recur=False)
-                for k in previous:
-                    output[k + "_previous"] = previous[k]
-
-        return output
-
-    def __getitem__(self, x):
-        return self.transform(self._getitem(self._paths[x]))
+        super().__init__(elems)

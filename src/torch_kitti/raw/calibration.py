@@ -80,7 +80,7 @@ class CamCalib:
                 if name == "calib_time":
                     continue
                 vector = np.array(list(map(float, vector.strip().split(" "))))
-                dict_values[name] = vector
+                dict_values[name] = vector.astype(np.float32)
 
         # convert
         cams = "0" + str(cam)
@@ -130,7 +130,7 @@ def _load_rototraslation(path: str) -> np.ndarray:
     rt[:3, :3] = R
     rt[:3, 3] = T
 
-    return rt
+    return rt.astype(np.float32)
 
 
 def load_imu_to_lidar(path: str) -> np.ndarray:

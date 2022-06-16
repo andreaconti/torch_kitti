@@ -7,15 +7,7 @@ from typing import Callable, Dict, Tuple, Union
 
 from typing_extensions import Literal
 
-from ..depth_completion.dataset import KittiDepthCompletionDataset
-
-_Cams = Union[
-    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
-]
-
-_Calibs = Union[
-    Tuple[str], Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]
-]
+from ..depth_completion.dataset import KittiDepthCompletionDataset, _identity
 
 
 class KittiDepthPredictionDataset(KittiDepthCompletionDataset):
@@ -54,36 +46,39 @@ class KittiDepthPredictionDataset(KittiDepthCompletionDataset):
         if used a previous nth frame from the same sequence is provided, a random
         previous frame in the range (n, m) is choosen if provided a tuple. If that
         frame is not available is provided the same frame twice.
+    load_sequence: int, optional
+        It loads a sequence of frames, stacking them into a np.ndarray new dimension
+        or in a list.
     transform: Callable[[Dict], Dict], optional
         transformation applied to each output dictionary.
     download: bool, default False
         If true, downloads the dataset from the internet and puts
         it in root directories. If dataset is already downloaded,
         it is not downloaded again.
-
-    .. note::
-        On the test subset `load_stereo` and `load_previous` can not be used
     """
 
     def __init__(
         self,
         kitti_raw_root: str,
-        depth_prediction_root: str,
+        kitti_completion_root: str,
         subset: Literal["train", "val", "test"] = "train",
         load_stereo: bool = False,
         load_previous: Union[Tuple[int, int], int] = 0,
-        transform: Callable[[Dict], Dict] = lambda x: x,
+        load_sequence: int = 1,
+        transform: Callable[[Dict], Dict] = _identity,
         download: bool = False,
     ):
+
         super().__init__(
             kitti_raw_root,
-            depth_prediction_root,
+            kitti_completion_root,
             subset,
             load_stereo,
             load_previous,
+            load_sequence,
             transform,
             download,
         )
 
-        for path in self._paths:
-            del path["lidar"]
+        for elem in self.elems:
+            elem.remove("lidar")
