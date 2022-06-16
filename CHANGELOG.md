@@ -16,6 +16,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+## [1.0.0] - 2022-06-16
+
+### Added
+
+- Added the ``elems`` interface to customize datasets
+
+## Changed
+
+- Changed the ``__init__`` interface to initialize raw, depth prediction and depth completion datasets
+
 ## [0.2.3] - 2020-11-20
 
 ### Fixed
