@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Fixed python 3.7 support
+
 ## [1.0.0] - 2022-06-16
 
 ### Added

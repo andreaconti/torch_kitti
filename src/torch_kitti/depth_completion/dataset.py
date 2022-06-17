@@ -5,9 +5,7 @@ Dataset loading for Depth Completion KITTI Dataset
 
 import os
 from typing import Callable, Dict, List, Tuple, Union
-import random
-
-from typing_extensions import Literal
+from torch_kitti._types import Literal
 
 from torch_kitti.depth_completion import download as kitti_depth_completion_download
 from torch_kitti.depth_completion import (

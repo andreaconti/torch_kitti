@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from torch_kitti.common import DataElem, DataGroup, GenericDataset, _LoadPrev
-from typing_extensions import Literal
+from torch_kitti._types import Literal
 
 from .synced_rectified import check_drives as sync_rect_check_drives
 from .synced_rectified import download as sync_rect_download

@@ -1,5 +1,5 @@
-from multiprocessing.sharedctypes import Value
-from typing import Dict, Iterable, List, Literal, Optional, Union
+from typing import Dict, List, Optional, Union
+from torch_kitti._types import Literal
 import numpy as np
 from torch_kitti.raw.calibration import CamCalib
 from torch_kitti.raw.inertial_measurement_unit import IMUData

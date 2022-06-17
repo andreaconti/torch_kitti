@@ -4,8 +4,7 @@ Dataset loading for Depth Completion KITTI Dataset
 """
 
 from typing import Callable, Dict, Tuple, Union
-
-from typing_extensions import Literal
+from torch_kitti._types import Literal
 
 from ..depth_completion.dataset import KittiDepthCompletionDataset, _identity
 
