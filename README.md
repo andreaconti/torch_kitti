@@ -91,7 +91,7 @@ class SeqKittiDepthCompletionDataset(KittiDepthCompletionDataset):
     def __init__(self, drive_name: str, *args, **kwargs):
         super().__init__(*args, subset="all", **kwargs)
         self.elems = sorted(
-            filter(lambda group: group.drive == drive_name, self.elems),
+            filter(lambda group: group.drive == drive_name and group.cam == 2, self.elems),
             key=lambda group: group.idx
         )
 
