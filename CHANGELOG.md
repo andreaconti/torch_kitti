@@ -16,7 +16,12 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+## [1.0.1] - 2022-07-21
+
+### Fixed
+
 - Fixed python 3.7 support
+- Fixed memory leak removing DataElem data caching
 
 ## [1.0.0] - 2022-06-16
 

@@ -49,7 +49,6 @@ class DataElem:
         self.cam = cam
         self.drive = drive
         self._idx = [idx]
-        self._data = None
         self.opts = kwargs
 
         # try to infer cam, drive, idx
@@ -171,9 +170,7 @@ class DataElem:
 
     @property
     def data(self):
-        if self._data is None:
-            self._data = self._load_funcs[self.type]()
-        return self._data
+        return self._load_funcs[self.type]()
 
     @property
     def idx(self) -> Union[List[int], int]:
@@ -218,8 +215,6 @@ class DataElem:
             assert idx is not None, "if path not provided, idx required"
             self._path = [self.change_path(idx)] + self._path
             self._idx = [idx] + self._idx
-
-        self._data = None
 
     def remove_path(self, idx: int):
         idx = self._idx.index(idx)
